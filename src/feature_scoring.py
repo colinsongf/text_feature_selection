@@ -10,17 +10,6 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils import check_array
 from sklearn.utils.extmath import safe_sparse_dot
 
-# otra implementacion de entropy (sacada del source de scikit learn)
-    # def entropy(samples):
-    # n_samples = len(samples)
-    # entropy = 0.
-    #
-    # for count in bincount(samples):
-    #     p = 1. * count / n_samples
-    #     if p > 0:
-    #         entropy -= p * np.log2(p)
-    #
-    # return entropy
 
 def _entropy(P):
     """
@@ -35,7 +24,7 @@ def _entropy(P):
     """
 
     #TODO remove the "+ 1e-20" inside the log2 computation
-    # it's just a hack to avoid compute log2(0)
+    # it's just a hack to avoid to compute log2(0)
     ent = -1.0 * np.sum(P * np.log2(P+1e-20), axis=0)
     return ent
 
@@ -54,7 +43,7 @@ def ig(X, y):
 
     Y_prob = (np.sum(Y, axis=0, dtype=np.float64) / len(Y)).reshape(-1, 1)
 
-    # calculate class entropy H(Y)
+    # calculate the class entropy H(Y)
     class_entropy = _entropy(Y_prob)
 
     X_y_count = safe_sparse_dot(Y.T, X)
@@ -62,7 +51,7 @@ def ig(X, y):
     X_y_prob = \
         X_y_count / np.sum(X_y_count, axis=0, dtype=np.float64)
 
-    # calculate class entropy given feature H(y|f_i)
+    # calculate the conditional entropy of the class given the feature H(y|f_i)
     cond_entropy = _entropy(X_y_prob) # TODO XXX FIXME ver si estoy calculando bien la entropia condicional
     print "class:", class_entropy
     print "cond_entropy:", cond_entropy
@@ -70,59 +59,6 @@ def ig(X, y):
     infogain = class_entropy - cond_entropy
 
     return infogain, None
-
-def infogain_score(X, y):
-
-    def get_t1(fc, c, f):
-        t = np.log2(fc/(c * f))
-        t[~np.isfinite(t)] = 0
-        return np.multiply(fc, t)
-
-    def get_t2(fc, c, f):
-        t = np.log2((1-f-c+fc)/((1-c)*(1-f)))
-        t[~np.isfinite(t)] = 0
-        return np.multiply((1-f-c+fc), t)
-
-    def get_t3(c, f, class_count, observed, total):
-        nfc = (class_count - observed)/total
-        t = np.log2(nfc/(c*(1-f)))
-        t[~np.isfinite(t)] = 0
-        return np.multiply(nfc, t)
-
-    def get_t4(c, f, feature_count, observed, total):
-        fnc = (feature_count - observed)/total
-        t = np.log2(fnc/((1-c)*f))
-        t[~np.isfinite(t)] = 0
-        return np.multiply(fnc, t)
-
-    X = check_array(X, accept_sparse='csr')
-    if np.any((X.data if issparse(X) else X) < 0):
-        raise ValueError("Input X must be non-negative.")
-
-    Y = LabelBinarizer().fit_transform(y)
-    if Y.shape[1] == 1:
-        Y = np.append(1 - Y, Y, axis=1)
-
-    # counts
-    observed = safe_sparse_dot(Y.T, X)          # n_classes * n_features
-    total = observed.sum(axis=0).reshape(1, -1).sum()
-    feature_count = X.sum(axis=0).reshape(1, -1)
-    class_count = (X.sum(axis=1).reshape(1, -1) * Y).T
-
-    # probs
-    f = feature_count / feature_count.sum()
-    c = class_count / float(class_count.sum())
-    fc = observed / total
-
-    # the feature score is averaged over classes
-    scores = (get_t1(fc, c, f) +
-            get_t2(fc, c, f) +
-            get_t3(c, f, class_count, observed, total) +
-            get_t4(c, f, feature_count, observed, total)).mean(axis=0)
-
-    scores = np.asarray(scores).reshape(-1)
-
-    return scores, None
 
 def _z_score(X):
     """
